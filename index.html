@@ -325,7 +325,34 @@ canvas#radar{display:block;margin:0 auto;}
       <button class="btn" id="icancel">Cancel</button>
     </div>
   </div>
-  <input type="text" id="isearch" placeholder="Search ingredients…">
+  <input type="text" id="isearch" placeholder="Search ingredients…" style="margin-bottom:8px;">
+
+  <!-- Taste + Layer filters -->
+  <div style="margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;min-width:38px;">Taste</span>
+      <div id="ifilter-mode" style="display:flex;border:1.5px solid #e8e6e0;border-radius:3px;overflow:hidden;margin-right:4px;">
+        <button class="ifmode on" data-m="has" style="font-size:10px;padding:3px 8px;border:none;background:#0a0a0a;color:#fff;cursor:pointer;font-family:Space Mono,monospace;">Has</button>
+        <button class="ifmode" data-m="missing" style="font-size:10px;padding:3px 8px;border:none;background:#fff;color:#0a0a0a;cursor:pointer;font-family:Space Mono,monospace;">Missing</button>
+      </div>
+      <button class="iftaste" data-t="sw" style="font-size:10px;padding:3px 8px;border:1.5px solid #EF9F27;border-radius:20px;background:#fff;color:#EF9F27;cursor:pointer;font-family:Space Mono,monospace;">Sweet</button>
+      <button class="iftaste" data-t="so" style="font-size:10px;padding:3px 8px;border:1.5px solid #E24B4A;border-radius:20px;background:#fff;color:#E24B4A;cursor:pointer;font-family:Space Mono,monospace;">Sour</button>
+      <button class="iftaste" data-t="sa" style="font-size:10px;padding:3px 8px;border:1.5px solid #378ADD;border-radius:20px;background:#fff;color:#378ADD;cursor:pointer;font-family:Space Mono,monospace;">Salty</button>
+      <button class="iftaste" data-t="bi" style="font-size:10px;padding:3px 8px;border:1.5px solid #7F77DD;border-radius:20px;background:#fff;color:#7F77DD;cursor:pointer;font-family:Space Mono,monospace;">Bitter</button>
+      <button class="iftaste" data-t="um" style="font-size:10px;padding:3px 8px;border:1.5px solid #1D9E75;border-radius:20px;background:#fff;color:#1D9E75;cursor:pointer;font-family:Space Mono,monospace;">Umami</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;min-width:38px;">Layer</span>
+      <button class="iflayer" data-l="1" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Aroma</button>
+      <button class="iflayer" data-l="2" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Attack</button>
+      <button class="iflayer" data-l="3" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Mid</button>
+      <button class="iflayer" data-l="4" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Late</button>
+      <button class="iflayer" data-l="5" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Pungent</button>
+      <button class="iflayer" data-l="6" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">Finish</button>
+      <button class="iflayer" data-l="7" style="font-size:10px;padding:3px 8px;border:1.5px solid #ccc;border-radius:20px;background:#fff;color:#555;cursor:pointer;font-family:Space Mono,monospace;">After</button>
+    </div>
+  </div>
+
   <div id="ilist"><div class="empty">Loading...</div></div>
 </div>
 
@@ -1289,11 +1316,44 @@ document.getElementById('psels').addEventListener('click',function(e){var c=e.ta
 // ── TAB 5: INGREDIENTS MANAGEMENT ──
 var ieditname=null;
 
+var iFilterTastes=[];
+var iFilterLayers=[];
+var iFilterMode='has';
+
 function rilist(){
   var el=document.getElementById('ilist');
   var srch=document.getElementById('isearch').value.toLowerCase();
   var m=imap();
-  var names=Object.keys(m).sort().filter(function(n){return !srch||n.toLowerCase().indexOf(srch)!==-1;});
+  var names=Object.keys(m).sort().filter(function(n){
+    if(srch&&n.toLowerCase().indexOf(srch)===-1)return false;
+    if(!iFilterTastes.length&&!iFilterLayers.length)return true;
+    var rows=m[n].rows;
+    // Taste filter
+    if(iFilterTastes.length){
+      var tasteMap={sw:'sw',so:'so',sa:'sa',bi:'bi',um:'um'};
+      if(iFilterMode==='has'){
+        var ok=iFilterTastes.every(function(t){return rows.some(function(r){return r[tasteMap[t]];});});
+        if(!ok)return false;
+      } else {
+        // missing: ingredient must NOT have any of the selected tastes
+        var hasAny=iFilterTastes.some(function(t){return rows.some(function(r){return r[tasteMap[t]];});});
+        if(hasAny)return false;
+      }
+    }
+    // Layer filter
+    if(iFilterLayers.length){
+      var allLayers=[];
+      rows.forEach(function(r){(r.layers||[]).forEach(function(l){if(allLayers.indexOf(l)===-1)allLayers.push(l);});});
+      if(iFilterMode==='has'){
+        var ok2=iFilterLayers.every(function(l){return allLayers.indexOf(l)!==-1;});
+        if(!ok2)return false;
+      } else {
+        var hasAnyL=iFilterLayers.some(function(l){return allLayers.indexOf(l)!==-1;});
+        if(hasAnyL)return false;
+      }
+    }
+    return true;
+  });
   if(!names.length){el.innerHTML='<div class="empty">No ingredients found.</div>';return;}
   el.innerHTML='<div class="mlist">'+names.map(function(n){
     var g=m[n];
@@ -1332,6 +1392,58 @@ function iopnform(name){
 document.getElementById('iadd').addEventListener('click',function(){iopnform(null);});
 document.getElementById('icancel').addEventListener('click',function(){document.getElementById('iform').classList.remove('show');});
 document.getElementById('isearch').addEventListener('input',rilist);
+
+// Taste filter chips
+document.getElementById('pane-ings').addEventListener('click',function(e){
+  var tb=e.target.closest('.iftaste');
+  if(tb){
+    var t=tb.dataset.t;
+    var idx=iFilterTastes.indexOf(t);
+    if(idx===-1){
+      iFilterTastes.push(t);
+      tb.style.opacity='1';
+      tb.style.fontWeight='700';
+      var tcolors={sw:'#EF9F27',so:'#E24B4A',sa:'#378ADD',bi:'#7F77DD',um:'#1D9E75'};
+      tb.style.background=tcolors[t]||'#0a0a0a';
+      tb.style.color='#fff';
+    } else {
+      iFilterTastes.splice(idx,1);
+      tb.style.background='#fff';
+      tb.style.fontWeight='400';
+      var tcolors2={sw:'#EF9F27',so:'#E24B4A',sa:'#378ADD',bi:'#7F77DD',um:'#1D9E75'};
+      tb.style.color=tcolors2[t]||'#555';
+    }
+    rilist();return;
+  }
+  // Layer filter chips
+  var lb=e.target.closest('.iflayer');
+  if(lb){
+    var l=parseInt(lb.dataset.l);
+    var idx2=iFilterLayers.indexOf(l);
+    if(idx2===-1){
+      iFilterLayers.push(l);
+      lb.style.background='#0a0a0a';
+      lb.style.color='#fff';
+      lb.style.borderColor='#0a0a0a';
+    } else {
+      iFilterLayers.splice(idx2,1);
+      lb.style.background='#fff';
+      lb.style.color='#555';
+      lb.style.borderColor='#ccc';
+    }
+    rilist();return;
+  }
+  // Mode toggle
+  var mb=e.target.closest('.ifmode');
+  if(mb){
+    iFilterMode=mb.dataset.m;
+    document.querySelectorAll('.ifmode').forEach(function(b){
+      b.style.background=b.dataset.m===iFilterMode?'#0a0a0a':'#fff';
+      b.style.color=b.dataset.m===iFilterMode?'#fff':'#0a0a0a';
+    });
+    rilist();return;
+  }
+});
 
 document.getElementById('isave').addEventListener('click',function(){
   var name=document.getElementById('ifname').value.trim();
