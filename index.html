@@ -180,6 +180,7 @@ td.kg{color:#aaa;font-size:10px;}
 .cki{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;}
 .cki input{width:auto;margin:0;}
 .steprow{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+.rsteprow{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;border:1.5px solid #e8e6e0;padding:10px 12px;background:#fafaf8;}
 .steprow .snum2{font-family:'Permanent Marker',cursive;font-size:18px;color:#e8e6e0;min-width:22px;padding-top:4px;}
 .steprow input[type=text]{margin:0;flex:1;}
 
@@ -1558,8 +1559,7 @@ function buildSingRow(name,g){
 function raddsteprow(d,stepIngs){
   rstepct++;var n=rstepct;
   var wrap=document.createElement('div');
-  wrap.className='steprow';
-  wrap.style.cssText='display:flex;flex-direction:column;gap:6px;margin-bottom:10px;border:1.5px solid #e8e6e0;padding:10px 12px;border-radius:4px;background:#fafaf8;';
+  wrap.className='rsteprow';
   var hdr=document.createElement('div');
   hdr.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;';
   var snum=document.createElement('div');
@@ -1596,8 +1596,8 @@ function raddsteprow(d,stepIngs){
 }
 
 function rnumsteps(){
-  document.querySelectorAll('#rfsteps .steprow').forEach(function(s,i){var sn=s.querySelector('.snum2');if(sn)sn.textContent=i+1;});
-  rstepct=document.querySelectorAll('#rfsteps .steprow').length;
+  document.querySelectorAll('#rfsteps .rsteprow').forEach(function(s,i){var sn=s.querySelector('.snum2');if(sn)sn.textContent=i+1;});
+  rstepct=document.querySelectorAll('#rfsteps .rsteprow').length;
 }
 
 function ropnrform(key){
@@ -1646,7 +1646,7 @@ document.getElementById('rfsteps').addEventListener('click',function(e){
   var b=e.target.closest('.sing-del');
   if(b){b.closest('.step-ing-row').remove();return;}
   var s=e.target.closest('.step-del');
-  if(s){s.closest('.steprow').remove();rnumsteps();}
+  if(s){s.closest('.rsteprow').remove();rnumsteps();}
 });
 document.getElementById('rflabel').addEventListener('change',function(){
   var file=this.files[0];if(!file)return;
@@ -1665,7 +1665,7 @@ document.getElementById('rsave').addEventListener('click',function(){
   if(!name){alert('Recipe name required.');return;}
   var key=reditkey||(name.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-'));
   var ings=[];document.querySelectorAll('#rfings .irow').forEach(function(row){var n=row.querySelector('.rIngName').value.trim();var g=parseFloat(row.querySelector('.rIngG').value)||0;if(n)ings.push({name:n,g:g});});
-  var steps=[];document.querySelectorAll('#rfsteps .steprow').forEach(function(row,i){
+  var steps=[];document.querySelectorAll('#rfsteps .rsteprow').forEach(function(row,i){
     var d=row.querySelector('.rStepD').value.trim();if(!d)return;
     var si=[];
     row.querySelectorAll('.step-ing-row').forEach(function(sir){
