@@ -417,7 +417,21 @@ function ecls(e){return e==='Hot 80c'?'eh':e==='Cold'?'ec':e==='N2O'?'en':'';}
 function fmtG(g){if(g>=1000)return (g/1000).toFixed(3).replace(/\.?0+$/,'')+'kg';if(g<1)return g.toFixed(3).replace(/\.?0+$/,'')+'g';return g.toFixed(2).replace(/\.?0+$/,'')+'g';}
 function fmtKg(g){return (g/1000).toFixed(4).replace(/\.?0+$/,'')+'kg';}
 function fmtD(ts){var d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
-function ss(st,msg){var d=document.getElementById('sdot'),l=document.getElementById('slbl');d.className='sdot '+st;l.textContent=msg;}
+function ss(st,msg){
+  var d=document.getElementById('sdot'),l=document.getElementById('slbl');
+  d.className='sdot '+st;
+  l.textContent=msg;
+  // Flash the whole status bar so it's impossible to miss
+  var bar=document.getElementById('statusbar');
+  if(bar){
+    bar.style.background=st==='ok'?'#1D9E75':st==='err'?'#E8312A':'#f7f6f2';
+    bar.style.color=st==='ok'||st==='err'?'#fff':'#0a0a0a';
+    setTimeout(function(){
+      bar.style.background='';
+      bar.style.color='';
+    },2000);
+  }
+}
 function imap(){
   var m={};
   // Start with hardcoded ingredient data (DING) as baseline
@@ -431,6 +445,24 @@ var LOWRISK=['low risk','dosing error','watery and flat','barely extracts'];
 function islr(s){var sl=s.toLowerCase();return LOWRISK.some(function(p){return sl.indexOf(p)!==-1;});}
 
 // ── CLOUD ──
+function syncFromCloud(){
+  fetch(URL+'/latest?t='+Date.now(),{headers:{'X-Master-Key':KEY,'X-Bin-Meta':'false'}})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!data||!data.recipes||Object.keys(data.recipes).length===0)return;
+      // Only update if cloud has more recent data - merge carefully
+      DB.recipes=data.recipes;
+      DB.briefs=data.briefs||{};
+      DB.brew_logs=data.brew_logs||DB.brew_logs;
+      if(data.ingredients&&data.ingredients.length>0) DB.ingredients=data.ingredients;
+      // Refresh current view
+      var activeTab=document.querySelector('.tab.on');
+      if(activeTab) initAll();
+      ss('ok','Synced');
+    })
+    .catch(function(e){ss('err','Sync failed');});
+}
+
 function saveDB(){
   ss('spin','Saving...');
   // Safety check — never save without recipes
@@ -446,7 +478,7 @@ function saveDB(){
 
 function initDB(){
   ss('spin','Loading...');
-  fetch(URL+'/latest',{headers:{'X-Master-Key':KEY,'X-Bin-Meta':'false'}})
+  fetch(URL+'/latest?t='+Date.now(),{headers:{'X-Master-Key':KEY,'X-Bin-Meta':'false'}})
     .then(function(r){return r.json();})
     .then(function(data){
       if(data&&data.brew_logs) DB.brew_logs=data.brew_logs;
@@ -471,6 +503,8 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('on');});
   b.classList.add('on');
   var pane=document.getElementById('pane-'+b.dataset.t);if(pane)pane.classList.add('on');
+  if(b.dataset.t==='builder')loadBriefSelect();
+  syncFromCloud();
 });
 
 // ── TAB 1: RECIPE ──
