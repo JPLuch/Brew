@@ -194,7 +194,8 @@ canvas#radar{display:block;margin:0 auto;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="sdot spin" id="sdot"></span>
     <span class="slbl" id="slbl">Connecting...</span>
-    <button onclick="exportDB()" style="font-size:9px;color:#ccc;background:none;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;margin-left:8px;">&#8595; Backup</button>
+    <button onclick="briefClaudio()" style="font-family:'Space Mono',monospace;font-size:9px;color:#ccc;background:none;border:1.5px solid #e8e6e0;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;margin-left:8px;">Brief Claudio</button>
+    <button onclick="backupDB()" style="font-family:'Space Mono',monospace;font-size:9px;color:#ccc;background:none;border:1.5px solid #e8e6e0;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;margin-left:4px;">↓ Backup</button>
   </div>
 </div>
 <div class="tabs">
@@ -834,7 +835,7 @@ var LAYERS=[
   {id:7,short:"After",name:"7 — After",desc:"What remains minutes later.",sci:"Amarogentin and tannins bind strongly. Pu-erh hui gan returns sweetness."}
 ];
 var bst={};LAYERS.forEach(function(l){bst[l.id]=[];});
-var blay=1,bsrch='';
+var blay=1,bsrch='',bTasteFilter='';
 
 function brtabs(){
   var el=document.getElementById('ltabs');
@@ -853,7 +854,8 @@ function brpanel(){
     var inL=ing&&ing.rows.some(function(r){return r.layers.indexOf(blay)!==-1;});
     var sel=bst[blay].indexOf(n)!==-1;
     var match=!bsrch||n.toLowerCase().indexOf(bsrch.toLowerCase())!==-1;
-    return (inL||sel)&&match;
+    var tasteMatch=!bTasteFilter||( ing&&ing.rows.some(function(r){return r[bTasteFilter]>0;}) );
+    return (inL||sel)&&match&&tasteMatch;
   });
   var chips=pool.map(function(n){
     var ing=m[n];
@@ -893,6 +895,15 @@ function brpanel(){
     '<div class="lname">'+esc(layer.name)+'</div>'+
     '<div class="ldesc">'+esc(layer.desc)+'</div>'+
     '<div class="lsci">'+esc(layer.sci)+'</div>'+
+    '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">'+
+    ['','sw','so','sa','bi','um'].map(function(t){
+      var labels={sw:'Sweet',so:'Sour',sa:'Salty',bi:'Bitter',um:'Umami'};
+      var colors={sw:'#EF9F27',so:'#E24B4A',sa:'#378ADD',bi:'#7F77DD',um:'#1D9E75'};
+      var on=bTasteFilter===t;
+      if(t==='')return '<button class="btf" data-t="" style="font-family:Space Mono,monospace;font-size:10px;padding:4px 10px;border:1.5px solid '+(on?'#0a0a0a':'#e8e6e0')+';background:'+(on?'#0a0a0a':'#fff')+';color:'+(on?'#fff':'#888')+';cursor:pointer;border-radius:20px;">All</button>';
+      return '<button class="btf" data-t="'+t+'" style="font-family:Space Mono,monospace;font-size:10px;padding:4px 10px;border:1.5px solid '+(on?colors[t]:'#e8e6e0')+';background:'+(on?colors[t]:'#fff')+';color:'+(on?'#fff':colors[t])+';cursor:pointer;border-radius:20px;">'+labels[t]+'</button>';
+    }).join('')+
+    '</div>'+
     '<input type="text" id="bsrch" placeholder="Search ingredient…" value="'+esc(bsrch)+'">'+
     '<div class="pool chips" id="bpool">'+chips+'</div>'+
     '<span class="lbl">In this layer</span>'+sel+
@@ -905,6 +916,9 @@ function brpanel(){
       '<span class="pb" style="font-size:10px;padding:2px 8px;">Pungent</span>'+
     '</div>';
   document.getElementById('bsrch').addEventListener('input',function(){bsrch=this.value;brpanel();});
+  document.getElementById('bpool').parentNode.querySelectorAll('.btf').forEach(function(btn){
+    btn.addEventListener('click',function(){bTasteFilter=this.dataset.t;brpanel();});
+  });
 }
 
 function brsum(){
@@ -1103,7 +1117,7 @@ document.getElementById('subpane-recipe').style.display='block';
 
 function brender(){brtabs();brpanel();brsum();document.getElementById('bprev').disabled=blay===1;document.getElementById('bnext').disabled=blay===7;}
 
-document.getElementById('ltabs').addEventListener('click',function(e){var b=e.target.closest('.lt');if(!b)return;blay=parseInt(b.dataset.lid);bsrch='';brender();});
+document.getElementById('ltabs').addEventListener('click',function(e){var b=e.target.closest('.lt');if(!b)return;blay=parseInt(b.dataset.lid);bsrch='';bTasteFilter='';brender();});
 document.addEventListener('click',function(e){
   var pool=document.getElementById('bpool');
   var c=e.target.closest('.chip');
@@ -2195,6 +2209,60 @@ function renderDevelop(drink){
     dh+='</div>';
     diagEl.innerHTML=dh;
   });
+}
+
+function backupDB(){
+  var d=new Date();
+  var ts=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var fname='empty-set-backup-'+ts+'.json';
+  var exportData=JSON.parse(JSON.stringify(DB));
+  exportData._exported=new Date().toISOString();
+  var json=JSON.stringify(exportData,null,2);
+  var uri='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+  var a=document.createElement('a');
+  a.href=uri;a.download=fname;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+function briefClaudio(){
+  var lines=['=== Empty Set Status === '+new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})];
+  // Recipes
+  var rkeys=Object.keys(DB.recipes||{});
+  lines.push('\nRECIPES ('+rkeys.length+'):');
+  rkeys.forEach(function(k){
+    var r=DB.recipes[k];
+    var vers=(DB.recipe_history&&DB.recipe_history[k]||[]).length;
+    var logs=(DB.brew_logs&&DB.brew_logs[k]||[]).length;
+    lines.push('  '+r.name+': '+(r.ingredients||[]).length+' ing, '+r.steps.length+' steps'+(vers?' | '+vers+' versions':'')+(logs?' | '+logs+' brew logs':''));
+    // Last changelog
+    if(r.notes){var firstLine=r.notes.split('\n')[0];lines.push('    Last save: '+firstLine);}
+  });
+  // Briefs
+  var bkeys=Object.keys(DB.briefs||{});
+  if(bkeys.length){
+    lines.push('\nBRIEFS ('+bkeys.length+'): '+bkeys.map(function(k){return DB.briefs[k].name;}).join(', '));
+  }
+  // Ingredients
+  lines.push('\nINGREDIENTS: '+((DB.ingredients||[]).length)+' in cloud + DING baseline');
+  // Brew logs summary
+  var logSummary=[];
+  Object.keys(DB.brew_logs||{}).forEach(function(k){
+    var logs=DB.brew_logs[k]||[];
+    if(logs.length)logSummary.push(k+' x'+logs.length+': "'+logs[0].txt.substring(0,60)+(logs[0].txt.length>60?'...':'')+'"');
+  });
+  if(logSummary.length){lines.push('\nBREW LOGS:');logSummary.forEach(function(l){lines.push('  '+l);});}
+
+  var text=lines.join('\n');
+  // Copy to clipboard
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(function(){
+      alert('Copied! Paste into your Claude conversation to brief Claudio.');
+    });
+  } else {
+    var ta=document.createElement('textarea');
+    ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    alert('Copied! Paste into your Claude conversation to brief Claudio.');
+  }
 }
 
 function initAll(){
