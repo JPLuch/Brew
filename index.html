@@ -443,143 +443,20 @@ function islr(s){var sl=s.toLowerCase();return LOWRISK.some(function(p){return s
 
 // ── CLOUD ──
 function saveDB(){
+  if(!DB.recipes||Object.keys(DB.recipes).length===0){ss('err','Save blocked');return;}
   ss('spin','Saving...');
-  // Safety check — never save without recipes
-  if(!DB.recipes||Object.keys(DB.recipes).length===0){
-    ss('err','Save blocked — no recipes');
-    console.error('saveDB blocked: recipes missing');
-    return;
-  }
-  // Always keep localStorage backup
-  try{localStorage.setItem('emptyset_backup',JSON.stringify(DB));localStorage.setItem('emptyset_backup_ts',Date.now());}catch(e){}
   fetch(URL,{method:'PUT',headers:HDR,body:JSON.stringify(DB)})
-    .then(function(r){ss('ok','Saved');})
-    .catch(function(e){ss('err','Save failed');});
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.metadata){
+        ss('ok','Saved ✓');
+        var m=document.getElementById('save-modal');
+        if(m)m.style.display='flex';
+      } else {ss('err','Save error');}
+    })
+    .catch(function(e){ss('err','Save failed');alert('Save failed: '+e.message);});
 }
 
-function exportDB(){
-  var d=new Date();
-  var ts=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  var fname='empty-set-backup-'+ts+'.json';
-  // Merge DING baseline with DB.ingredients (DB takes precedence)
-  var m=imap();
-  var allIngs=Object.keys(m).map(function(n){
-    var r=m[n].rows[0];
-    return [n,r.ext,r.sw,r.so,r.sa,r.bi,r.um,r.overSign,r.overFeel,r.layers];
-  });
-  var exportData=JSON.parse(JSON.stringify(DB));
-  exportData.ingredients=allIngs;
-  exportData._exported=new Date().toISOString();
-  exportData._ingredientCount=allIngs.length;
-  var blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});
-  var u=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=u;a.download=fname;a.click();
-  URL.revokeObjectURL(u);
-}
-
-function mergeIngredientsOnly(newIngs){
-  // Safe ingredient update — never touches recipes, briefs or brew logs
-  if(!DB.recipes||Object.keys(DB.recipes).length===0){
-    console.error('mergeIngredientsOnly blocked — recipes missing from DB');
-    return false;
-  }
-  DB.ingredients=newIngs;
-  saveDB();
-  return true;
-}
-
-// Subtab switching
-document.getElementById('pane-drinks').addEventListener('click',function(e){
-  var b=e.target.closest('.subtab');if(!b)return;
-  var s=b.dataset.s;
-  document.querySelectorAll('.subtab').forEach(function(t){t.style.color='#888';t.style.borderBottom='2px solid transparent';});
-  b.style.color='#0a0a0a';b.style.borderBottom='2px solid #0a0a0a';
-  ['brew','develop','product','recipe'].forEach(function(id){
-    var el=document.getElementById('subpane-'+id);
-    if(el)el.style.display=id===s?'block':'none';
-  });
-  if(s==='brew'){updateVerBar();rrender();}
-  if(s==='product'&&rDrink){prodRender(rDrink);drawRadar(rDrink);drawRadar2(rDrink);}
-  if(s==='develop'&&rDrink)renderDevelop(rDrink);
-  if(s==='recipe'){rrlist();if(rDrink)ropnrform(rDrink);}
-});
-
-// Version dropdown change - preview that version
-document.getElementById('pane-drinks').addEventListener('change',function(e){
-  if(e.target.id!=='ver-sel')return;
-  var idx=e.target.value;
-  if(idx===''){rrender();return;}
-  var versions=(DB.recipe_history&&DB.recipe_history[rDrink])||[];
-  var v=versions[parseInt(idx)];
-  if(!v)return;
-  // Preview this version directly in rout
-  var el=document.getElementById('rout');
-  if(!el)return;
-  var mx=rVol/(v.base||1);
-  var ings=(v.ingredients||[]).map(function(i){return '<tr><td class="b">'+esc(i.name)+'</td><td class="r b">'+fmtG(i.g*mx)+'</td><td class="r kg">'+fmtKg(i.g*mx)+'</td></tr>';}).join('');
-  var steps=(v.steps||[]).map(function(s){
-    var si=(s.i||[]).length?
-      '<div style="margin-top:8px;border-top:1px solid #f0efe9;padding-top:6px;">'+
-      (s.i||[]).map(function(x){return '<div class="sing" style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:12px;font-weight:700;">'+esc(x.name)+'</span><span style="font-size:12px;font-family:Space Mono,monospace;font-weight:700;">'+fmtG(x.g*mx)+'</span></div>';}).join('')+'</div>':
-      '<div style="font-size:11px;color:#bbb;margin-top:4px;font-style:italic;">No ingredients at this step</div>';
-    return '<div class="step" style="border:1.5px solid #e8e6e0;padding:12px 14px;margin-bottom:8px;border-radius:4px;display:flex;gap:12px;background:#fff;">'+
-      '<div class="snum" style="font-family:Permanent Marker,cursive;font-size:22px;color:#e8e6e0;min-width:26px;flex-shrink:0;">'+s.n+'</div>'+
-      '<div style="flex:1;"><div style="font-size:12px;font-weight:700;margin-bottom:4px;">'+esc(s.d)+'</div>'+si+'</div></div>';
-  }).join('');
-  var d=new Date(v._saved);
-  var label=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  el.innerHTML=
-    '<div style="font-size:10px;color:#888;font-family:Space Mono,monospace;margin-bottom:12px;padding:6px 10px;background:#f7f6f2;border-left:3px solid #c8a86e;">Previewing version: '+label+'</div>'+
-    '<div class="rname">'+esc(v.name)+'</div>'+
-    '<div class="rvol">'+rVol+'L batch</div>'+
-    '<span class="lbl">Brew checklist</span>'+
-    '<table class="chkt"><tr><th>Ingredient</th><th class="r">Amount</th><th class="r kg">Per kg</th></tr>'+ings+'</table>'+
-    '<span class="lbl">Process</span><div class="steps">'+steps+'</div>'+
-    (v.notes?'<span class="lbl">Change log</span><div class="notes">'+esc(v.notes)+'</div>':'');
-});
-
-// Restore button - snapshot current first, then restore selected
-document.getElementById('pane-drinks').addEventListener('click',function(e){
-  if(e.target.id!=='ver-restore')return;
-  var sel=document.getElementById('ver-sel');
-  if(!sel||sel.value==='')return;
-  var idx=parseInt(sel.value);
-  var versions=(DB.recipe_history&&DB.recipe_history[rDrink])||[];
-  if(!versions[idx])return;
-  if(!confirm('Restore this version? Current recipe will be saved to history first.'))return;
-  // Snapshot current recipe to history with today datetime
-  if(!DB.recipe_history[rDrink])DB.recipe_history[rDrink]=[];
-  var snap=JSON.parse(JSON.stringify(DB.recipes[rDrink]));
-  snap._saved=Date.now();
-  DB.recipe_history[rDrink].unshift(snap);
-  if(DB.recipe_history[rDrink].length>20)DB.recipe_history[rDrink]=DB.recipe_history[rDrink].slice(0,20);
-  // Restore selected version as current
-  var restored=JSON.parse(JSON.stringify(versions[idx]));
-  delete restored._saved;
-  var rd=new Date(versions[idx]._saved);
-  var rlabel=rd.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+rd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  var nd=new Date();
-  restored.notes=(nd.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+nd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'\nRestored from version: '+rlabel);
-  DB.recipes[rDrink]=restored;
-  saveDB();
-  updateVerBar();
-  sel.value='';
-  rrender();
-});
-
-// rrlist filtered to active drink
-function rrlistFiltered(){
-  var el=document.getElementById('rlist');if(!el)return;
-  var keys=Object.keys(DB.recipes||{});
-  if(rDrink)keys=keys.filter(function(k){return k===rDrink;});
-  if(!keys.length){el.innerHTML='<div class="empty">No recipe yet.</div>';return;}
-  el.innerHTML='<div class="mlist">'+keys.map(function(k){
-    var r=DB.recipes[k];
-    return '<div class="mitem"><div class="minf"><div class="mnm">'+esc(r.name)+'</div></div>'+
-      '<div class="mact"><button class="btn sm" data-redit="'+k+'">Edit</button><button class="btn sm red" data-rdel="'+k+'">Del</button></div></div>';
-  }).join('')+'</div>';
-}
 
 function initDB(){
   ss('spin','Loading...');
