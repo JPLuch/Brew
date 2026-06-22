@@ -211,7 +211,7 @@ canvas#radar{display:block;margin:0 auto;}
   <div class="dbtns" id="dbtns"></div>
 
   <div style="display:flex;gap:0;margin-bottom:16px;margin-top:12px;border-bottom:2px solid #0a0a0a;">
-    <button class="subtab on" data-s="brew" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:7px 14px;border:none;background:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;color:#0a0a0a;border-bottom:2px solid #0a0a0a;margin-bottom:-2px;">Brew</button>
+    <button class="subtab" data-s="brew" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:7px 14px;border:none;background:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;color:#0a0a0a;border-bottom:2px solid #0a0a0a;margin-bottom:-2px;">Brew</button>
     <button class="subtab" data-s="develop" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:7px 14px;border:none;background:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;">Develop</button>
     <button class="subtab" data-s="product" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:7px 14px;border:none;background:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;">Product</button>
     <button class="subtab" data-s="recipe" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:7px 14px;border:none;background:none;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;">Recipe</button>
@@ -487,6 +487,37 @@ document.querySelector('.tabs').addEventListener('click',function(e){
   var pane=document.getElementById('pane-'+b.dataset.t);if(pane)pane.classList.add('on');
 });
 
+// ── SUBTABS (Brew / Develop / Product / Recipe) ──
+document.querySelectorAll('.subtab').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    // Update active subtab style
+    document.querySelectorAll('.subtab').forEach(function(t){
+      t.style.color='#888';
+      t.style.borderBottom='2px solid transparent';
+    });
+    this.style.color='#0a0a0a';
+    this.style.borderBottom='2px solid #0a0a0a';
+
+    // Hide all subpanes
+    ['brew','develop','product','recipe'].forEach(function(s){
+      var el=document.getElementById('subpane-'+s);
+      if(el)el.style.display='none';
+    });
+
+    // Show the selected subpane
+    var s=this.dataset.s;
+    var sp=document.getElementById('subpane-'+s);
+    if(sp)sp.style.display='block';
+
+    // Trigger renders that depend on the pane being visible
+    if(s==='product'&&rDrink){
+      setTimeout(function(){drawRadar(rDrink);drawRadar2(rDrink);prodRender(rDrink);},0);
+    }
+    if(s==='develop'&&rDrink)renderDevelop(rDrink);
+    if(s==='recipe'){rrlist();if(rDrink)ropnrform(rDrink);}
+  });
+});
+
 // ── TAB 1: RECIPE ──
 var rDrink=null,rVol=1;
 
@@ -685,17 +716,19 @@ function rrender(){
 document.getElementById('dbtns').addEventListener('click',function(e){
   var b=e.target.closest('.dbtn');if(!b)return;
   document.querySelectorAll('.dbtn').forEach(function(x){x.className='dbtn';});
-  b.classList.add('dbtn',b.dataset.d);
-  rDrink=b.dataset.d;
+  var dk=b.dataset.d;if(!dk)return;
+  b.classList.add('dbtn',dk);
+  rDrink=dk;
   updateVerBar();
+  // Find active subtab by checking which subtab has the active style
+  var activeSub='brew';
+  document.querySelectorAll('.subtab').forEach(function(t){
+    if(t.style.borderBottom&&t.style.borderBottom.indexOf('rgb(10, 10, 10)')!==-1)activeSub=t.dataset.s;
+  });
   rrender();
-  var as=document.querySelector('.subtab.on');
-  if(as){
-    var s=as.dataset.s;
-    if(s==='product'){drawRadar(rDrink);drawRadar2(rDrink);prodRender(rDrink);}
-    if(s==='develop')renderDevelop(rDrink);
-    if(s==='recipe'){rrlist();ropnrform(rDrink);}
-  }
+  if(activeSub==='product'){setTimeout(function(){drawRadar(rDrink);drawRadar2(rDrink);prodRender(rDrink);},0);}
+  if(activeSub==='develop')renderDevelop(rDrink);
+  if(activeSub==='recipe'){rrlist();ropnrform(rDrink);}
 });
 document.getElementById('vol').addEventListener('input',function(){
   var v=parseFloat(this.value);if(!isNaN(v)&&v>0){rVol=v;rrender();drawRadar(rDrink);drawRadar2(rDrink);}
@@ -1828,7 +1861,6 @@ function hexToRgb(hex){
 function drawRadar(drink){
   var canvas=document.getElementById('radar');
   if(!canvas||!drink||!DB.recipes[drink])return;
-  if(!canvas.offsetParent)return;
 
   var r=DB.recipes[drink];
   var m=imap();
@@ -1917,7 +1949,6 @@ function drawRadar(drink){
 function drawRadar2(drink){
   var canvas=document.getElementById('radar2');
   if(!canvas||!drink||!DB.recipes[drink])return;
-  if(!canvas.offsetParent)return;
   var r=DB.recipes[drink];
   var m=imap();
   var color=DRINK_COLORS[drink]||'#0a0a0a';
@@ -2284,12 +2315,7 @@ function prodRender(drink){
   }
 }
 
-document.getElementById('dbtns').addEventListener('click',function(e){
-  var b=e.target.closest('[data-pd]');if(!b)return;
-  document.querySelectorAll('#prod-dbtns .dbtn').forEach(function(x){x.className='dbtn';});
-  b.classList.add('dbtn',b.dataset.pd);
-  prodRender(b.dataset.pd);
-});
+// (product drink selection handled by unified dbtns listener above)
 
 document.getElementById('brief-select').addEventListener('change',function(){
   showBriefPanel(this.value);
