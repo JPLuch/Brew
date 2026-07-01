@@ -89,8 +89,9 @@ var BIN='6a3a8322da38895dfef17cdd';
 var KEY='$2a$10$1KbEFw0qHA5Zg6A0mLrxy.dJPEwTs6xwxIwtz1bVnnEiB2SDEBAea';
 var BURL='https://api.jsonbin.io/v3/b/'+BIN;
 var CO2_GL_PER_BAR=3.3;
-var METHOD_LABEL={Hot:'Hot brew',Cold:'Cold brew',N2O:'N\u2082O',CO2:'CO\u2082',Additive:'Additives',Carbonation:'Carbonation'};
-var PREP_TYPES=['Hot','Cold','N2O','CO2','Additive','Carbonation'];
+var METHOD_LABEL={Hot:'Hot brew',Cold:'Cold brew',N2O:'N\u2082O',CO2:'CO\u2082',Additive:'Additives',Filter:'Filter',Pasteurise:'Flash pasteurise',Carbonation:'Carbonation'};
+var PREP_TYPES=['Hot','Cold','N2O','CO2','Additive','Filter','Pasteurise','Carbonation'];
+var FILTER_UM={coarse:'5\u201310\u00B5m',polish:'1\u00B5m',fine:'0.45\u00B5m'};
 
 var DATA=null;          // full bin payload {v, recipes, methods}
 var loaded=false;
@@ -114,6 +115,8 @@ function settingUnit(m){return m==='Hot'?'min':(m==='Cold'?'hr':((m==='N2O'||m==
 function batchHeader(m,sample){
   var base=METHOD_LABEL[m]||m;
   if(m==='Additive')return base+' — added direct';
+  if(m==='Filter')return base+((sample&&sample.set)?(' — '+(FILTER_UM[sample.set]||sample.set)):'');
+  if(m==='Pasteurise')return base+' — 72–75\u00B0C';
   var setVal=sample&&sample.set!=null&&sample.set!==''?sample.set:null;
   if(m==='Carbonation')return base+(setVal!=null?(' — '+setVal+' bar (\u2248'+(CO2_GL_PER_BAR*setVal).toFixed(1)+' g/L)'):'');
   if(m==='Hot'){
@@ -126,6 +129,8 @@ function batchHeader(m,sample){
   return base+(setVal!=null?(' — '+setVal+' '+settingUnit(m)):'');
 }
 function rowSetting(it){
+  if(it.method==='Filter')return FILTER_UM[it.set]||'';
+  if(it.method==='Pasteurise')return 'flash 72–75\u00B0C';
   var u=settingUnit(it.method);
   if(it.method==='Additive')return '';
   if(it.set==null||it.set==='')return '';
@@ -224,7 +229,9 @@ function renderBrew(app){
       var it=o.it,idx=o.idx,key=itemKey(it,idx),on=!!ticks[key];
       var setTxt=rowSetting(it);
       var doseHtml;
-      if(it.method==='Carbonation'){
+      if(it.method==='Filter'||it.method==='Pasteurise'){
+        doseHtml='';
+      } else if(it.method==='Carbonation'){
         doseHtml='<div class="cdose">\u2248'+(CO2_GL_PER_BAR*(it.set||0)).toFixed(1)+' g/L</div>';
       } else {
         var perL=(it.dose!=null?it.dose:0);
